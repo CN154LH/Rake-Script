@@ -4,15 +4,13 @@ local Window = Rayfield:CreateWindow({
     LoadingTitle = "Script loading...",
     LoadingSubtitle = "by 助手",
     ConfigurationSaving = { Enabled = false },
-    KeySystem = false, -- 如需密钥验证可设置为true
+    KeySystem = false,
 })
 
--- 主标签页
 local MainTab = Window:CreateTab("玩家增强", nil)
 local VisualsTab = Window:CreateTab("视觉辅助", nil)
 local AutoTab = Window:CreateTab("自动游戏", nil)
 
--- 无限跳跃功能
 local InfiniteJumpEnabled = false
 game:GetService("UserInputService").JumpRequest:connect(function()
     if InfiniteJumpEnabled then
@@ -48,7 +46,6 @@ MainTab:CreateSlider({
     end,
 })
 
--- 跳跃力量调节
 MainTab:CreateSlider({
     Name = "跳跃力量",
     Range = {50, 200},
@@ -63,7 +60,6 @@ MainTab:CreateSlider({
     end,
 })
 
--- 玩家透视 (ESP)
 VisualsTab:CreateToggle({
     Name = "显示玩家位置 (ESP)",
     CurrentValue = false,
@@ -80,7 +76,7 @@ VisualsTab:CreateToggle({
                 end
             end
         else
-            -- 移除ESP
+
             for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
                 if player.Character and player.Character:FindFirstChild("RAKE_ESP") then
                     player.Character.RAKE_ESP:Destroy()
@@ -90,7 +86,6 @@ VisualsTab:CreateToggle({
     end,
 })
 
--- 自动农场 (基础版)
 local AutoFarmEnabled = false
 AutoTab:CreateToggle({
     Name = "开启自动农场",
@@ -105,10 +100,7 @@ AutoTab:CreateToggle({
                 Duration = 3
             })
             
-            -- 这里是自动农场的核心循环
             while AutoFarmEnabled do
-                -- 注意：你需要根据RAKE游戏的具体机制来完善这部分逻辑
-                -- 例如：自动收集物品、完成特定任务等
                 wait(1)
             end
         else
