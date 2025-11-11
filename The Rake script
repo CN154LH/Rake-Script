@@ -1,4 +1,3 @@
-local Start = tick(loadstring(game:HttpGet('https://raw.githubusercontent.com/CN154LH/Rake-Script/main/The%20Rake%20script'))())
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
     Name = "The Rake script",
@@ -10,12 +9,29 @@ local Window = Rayfield:CreateWindow({
 
 local MainTab = Window:CreateTab("玩家增强", nil)
 local VisualsTab = Window:CreateTab("视觉辅助", nil)
-local AutoTab = Window:CreateTab("自动游戏", nil)
 
 local InfiniteJumpEnabled = false
-game:GetService("UserInputService").JumpRequest:connect(function()
+local PlayerESPEnabled = false
+local RakeESPEnabled = false
+local FlareGunESPEnabled = false
+local LootboxESPEnabled = false
+
+local PlayerESPObjects = {}
+local ItemESPObjects = {}
+local RakeESPObjects = {}
+
+local currentWalkSpeed = 16
+local currentJumpPower = 50
+
+game:GetService("UserInputService").JumpRequest:Connect(function()
     if InfiniteJumpEnabled then
-        game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+        local player = game:GetService("Players").LocalPlayer
+        if player and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState("Jumping")
+            end
+        end
     end
 end)
 
@@ -24,11 +40,6 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Callback = function(Value)
         InfiniteJumpEnabled = Value
-        Rayfield:Notify({
-            Title = "无限跳跃",
-            Content = Value and "已开启" or "已关闭",
-            Duration = 2
-        })
     end,
 })
 
@@ -37,11 +48,15 @@ MainTab:CreateSlider({
     Range = {16, 200},
     Increment = 1,
     Suffix = "速度",
-    CurrentValue = 16,
+    CurrentValue = currentWalkSpeed,
     Callback = function(Value)
-        local character = game:GetService("Players").LocalPlayer.Character
-        if character and character:FindFirstChildOfClass("Humanoid") then
-            character.Humanoid.WalkSpeed = Value
+        currentWalkSpeed = Value
+        local player = game:GetService("Players").LocalPlayer
+        if player and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = Value
+            end
         end
     end,
 })
@@ -51,65 +66,228 @@ MainTab:CreateSlider({
     Range = {50, 200},
     Increment = 1,
     Suffix = "力量",
-    CurrentValue = 50,
+    CurrentValue = currentJumpPower,
     Callback = function(Value)
-        local character = game:GetService("Players").LocalPlayer.Character
-        if character and character:FindFirstChildOfClass("Humanoid") then
-            character.Humanoid.JumpPower = Value
+        currentJumpPower = Value
+        local player = game:GetService("Players").LocalPlayer
+        if player and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.JumpPower = Value
+            end
+        end
+    end,
+})
+
+local function addPlayerESP(player)
+    if not PlayerESPEnabled or player == game:GetService("Players").LocalPlayer then return end
+    
+    local function createESP(character)
+        if character and not PlayerESPObjects[player] then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "PlayerESP"
+            highlight.Adornee = character
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.FillTransparency = 0.3
+            highlight.Parent = game.CoreGui
+            
+            PlayerESPObjects[player] = highlight
+        end
+    end
+    
+    if player.Character then
+        createESP(player.Character)
+    end
+    
+    player.CharacterAdded:Connect(createESP)
+end
+
+VisualsTab:CreateToggle({
+    Name = "显示玩家位置",
+    CurrentValue = false,
+    Callback = function(Value)
+        PlayerESPEnabled = Value
+        if Value then
+            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+                addPlayerESP(player)
+            end
+            game:GetService("Players").PlayerAdded:Connect(addPlayerESP)
+        else
+            for player, espObject in pairs(PlayerESPObjects) do
+                if espObject then
+                    espObject:Destroy()
+                end
+                PlayerESPObjects[player] = nil
+            end
         end
     end,
 })
 
 VisualsTab:CreateToggle({
-    Name = "显示玩家位置 (ESP)",
+    Name = "显示RAKE位置",
     CurrentValue = false,
     Callback = function(Value)
+        RakeESPEnabled = Value
         if Value then
-            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-                if player ~= game:GetService("Players").LocalPlayer and player.Character then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Parent = player.Character
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.Name = "RAKE_ESP"
-                end
-            end
+            scanForRakes()
         else
-            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-                if player.Character and player.Character:FindFirstChild("RAKE_ESP") then
-                    player.Character.RAKE_ESP:Destroy()
-                end
-            end
+            removeRakeESP()
         end
     end,
 })
 
-local AutoFarmEnabled = false
-AutoTab:CreateToggle({
-    Name = "开启自动农场",
+VisualsTab:CreateToggle({
+    Name = "显示信号枪位置",
     CurrentValue = false,
     Callback = function(Value)
-        AutoFarmEnabled = Value
-        
+        FlareGunESPEnabled = Value
         if Value then
-            Rayfield:Notify({
-                Title = "自动农场",
-                Content = "已开始自动收集资源",
-                Duration = 3
-            })
-            
-            while AutoFarmEnabled do
-                wait(1)
-            end
+            scanForFlareGuns()
         else
-            Rayfield:Notify({
-                Title = "自动农场",
-                Content = "已停止自动收集",
-                Duration = 2
-            })
+            removeESPByType("FlareGun")
         end
     end,
 })
+
+VisualsTab:CreateToggle({
+    Name = "显示战利品箱位置",
+    CurrentValue = false,
+    Callback = function(Value)
+        LootboxESPEnabled = Value
+        if Value then
+            scanForLootboxes()
+        else
+            removeESPByType("Lootbox")
+        end
+    end,
+})
+
+function scanForRakes()
+    if not RakeESPEnabled then return end
+    
+    for _, npc in pairs(workspace:GetChildren()) do
+        if npc:IsA("Model") and (string.find(string.lower(npc.Name), "rake")) then
+            addRakeESP(npc)
+        end
+    end
+end
+
+function addRakeESP(rakeModel)
+    if RakeESPObjects[rakeModel] then return end
+
+    local primaryPart = rakeModel.PrimaryPart or rakeModel:FindFirstChild("HumanoidRootPart")
+    if not primaryPart then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "RakeESP"
+    highlight.Adornee = rakeModel
+    highlight.FillColor = Color3.fromRGB(139, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.3
+    highlight.Parent = game.CoreGui
+
+    RakeESPObjects[rakeModel] = highlight
+end
+
+function removeRakeESP()
+    for rakeModel, espObject in pairs(RakeESPObjects) do
+        if espObject then
+            espObject:Destroy()
+        end
+        RakeESPObjects[rakeModel] = nil
+    end
+end
+
+function scanForFlareGuns()
+    if not FlareGunESPEnabled then return end
+    
+    for _, item in pairs(workspace:GetChildren()) do
+        if item:IsA("Model") and (string.find(string.lower(item.Name), "flare") or string.find(string.lower(item.Name), "signal")) then
+            addItemESP(item, "FlareGun", Color3.fromRGB(255, 255, 0))
+        end
+    end
+end
+
+function scanForLootboxes()
+    if not LootboxESPEnabled then return end
+    
+    for _, item in pairs(workspace:GetChildren()) do
+        if item:IsA("Model") and (string.find(string.lower(item.Name), "lootbox") or string.find(string.lower(item.Name), "loot") or string.find(string.lower(item.Name), "crate")) then
+            addItemESP(item, "Lootbox", Color3.fromRGB(0, 255, 0))
+        end
+    end
+end
+
+function addItemESP(itemModel, itemType, color)
+    if ItemESPObjects[itemModel] then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = itemType .. "ESP"
+    highlight.Adornee = itemModel
+    highlight.FillColor = color
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.3
+    highlight.Parent = game.CoreGui
+
+    ItemESPObjects[itemModel] = {
+        Highlight = highlight,
+        Type = itemType
+    }
+end
+
+function removeItemESP(itemModel)
+    local espObject = ItemESPObjects[itemModel]
+    if espObject then
+        if espObject.Highlight then espObject.Highlight:Destroy() end
+        ItemESPObjects[itemModel] = nil
+    end
+end
+
+function removeESPByType(itemType)
+    for itemModel, espObject in pairs(ItemESPObjects) do
+        if espObject.Type == itemType then
+            removeItemESP(itemModel)
+        end
+    end
+end
+
+game:GetService("Players").PlayerRemoving:Connect(function(player)
+    if PlayerESPObjects[player] then
+        PlayerESPObjects[player]:Destroy()
+        PlayerESPObjects[player] = nil
+    end
+end)
+
+game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(character)
+    character:WaitForChild("Humanoid")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = currentWalkSpeed
+        humanoid.JumpPower = currentJumpPower
+    end
+end)
+
+local player = game:GetService("Players").LocalPlayer
+if player and player.Character then
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = currentWalkSpeed
+        humanoid.JumpPower = currentJumpPower
+    end
+end
+
+game:GetService("RunService").Heartbeat:Connect(function()
+    if RakeESPEnabled then
+        scanForRakes()
+    end
+    if FlareGunESPEnabled then
+        scanForFlareGuns()
+    end
+    if LootboxESPEnabled then
+        scanForLootboxes()
+    end
+end)
 
 Rayfield:Notify({
     Title = "脚本加载成功",
