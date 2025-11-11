@@ -11,14 +11,17 @@ local MainTab = Window:CreateTab("玩家增强", nil)
 local VisualsTab = Window:CreateTab("视觉辅助", nil)
 
 local InfiniteJumpEnabled = false
+local SpeedEnabled = false
 local PlayerESPEnabled = false
 local RakeESPEnabled = false
 local FlareGunESPEnabled = false
 local LootboxESPEnabled = false
+local FullBrightEnabled = false
 
 local PlayerESPObjects = {}
 local ItemESPObjects = {}
 local RakeESPObjects = {}
+local FullBrightConnection
 
 local currentWalkSpeed = 16
 local currentJumpPower = 50
@@ -43,19 +46,40 @@ MainTab:CreateToggle({
     end,
 })
 
+MainTab:CreateToggle({
+    Name = "开启速度调整",
+    CurrentValue = false,
+    Callback = function(Value)
+        SpeedEnabled = Value
+        local player = game:GetService("Players").LocalPlayer
+        if player and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                if Value then
+                    humanoid.WalkSpeed = currentWalkSpeed
+                else
+                    humanoid.WalkSpeed = 16
+                end
+            end
+        end
+    end,
+})
+
 MainTab:CreateSlider({
     Name = "移动速度",
-    Range = {16, 200},
+    Range = {16, 50},
     Increment = 1,
     Suffix = "速度",
     CurrentValue = currentWalkSpeed,
     Callback = function(Value)
         currentWalkSpeed = Value
-        local player = game:GetService("Players").LocalPlayer
-        if player and player.Character then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.WalkSpeed = Value
+        if SpeedEnabled then
+            local player = game:GetService("Players").LocalPlayer
+            if player and player.Character then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = Value
+                end
             end
         end
     end,
@@ -79,20 +103,114 @@ MainTab:CreateSlider({
     end,
 })
 
+VisualsTab:CreateToggle({
+    Name = "游戏全亮",
+    CurrentValue = false,
+    Callback = function(Value)
+        FullBrightEnabled = Value
+        if Value then
+            FullBrightConnection = game:GetService("RunService").RenderStepped:Connect(function()
+                if not FullBrightEnabled then
+                    FullBrightConnection:Disconnect()
+                    return
+                end
+                
+                local lighting = game:GetService("Lighting")
+                lighting.Ambient = Color3.new(1, 1, 1)
+                lighting.Brightness = 2
+                lighting.GlobalShadows = false
+                lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+                
+                for _, obj in pairs(lighting:GetChildren()) do
+                    if obj:IsA("Sky") then
+                        obj:Destroy()
+                    end
+                end
+            end)
+        else
+            if FullBrightConnection then
+                FullBrightConnection:Disconnect()
+            end
+            local lighting = game:GetService("Lighting")
+            lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
+            lighting.Brightness = 1
+            lighting.GlobalShadows = true
+            lighting.OutdoorAmbient = Color3.new(0.5, 0.5, 0.5)
+        end
+    end,
+})
+
+local function createBillboardGUI(adornee, text, color)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_Billboard"
+    billboard.Adornee = adornee
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 500
+    billboard.Parent = game.CoreGui
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = text
+    textLabel.TextColor3 = color
+    textLabel.TextSize = 12
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Parent = billboard
+    
+    return {Billboard = billboard, TextLabel = textLabel}
+end
+
+local function updateDistance(espObject, targetPart, name)
+    if not espObject or not espObject.TextLabel then return end
+    
+    local localPlayer = game:GetService("Players").LocalPlayer
+    if not localPlayer or not localPlayer.Character then return end
+    
+    local localRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = targetPart
+    
+    if not localRoot or not targetRoot then return end
+    
+    local distance = (localRoot.Position - targetRoot.Position).Magnitude
+    espObject.TextLabel.Text = string.format("%s\n%d studs", name, math.floor(distance))
+end
+
 local function addPlayerESP(player)
     if not PlayerESPEnabled or player == game:GetService("Players").LocalPlayer then return end
     
     local function createESP(character)
         if character and not PlayerESPObjects[player] then
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then return end
+            
             local highlight = Instance.new("Highlight")
             highlight.Name = "PlayerESP"
             highlight.Adornee = character
             highlight.FillColor = Color3.fromRGB(255, 0, 0)
             highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
             highlight.FillTransparency = 0.3
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             highlight.Parent = game.CoreGui
             
-            PlayerESPObjects[player] = highlight
+            local billboard = createBillboardGUI(humanoidRootPart, player.Name, Color3.fromRGB(255, 0, 0))
+            
+            PlayerESPObjects[player] = {
+                Highlight = highlight,
+                Billboard = billboard.Billboard,
+                TextLabel = billboard.TextLabel,
+                Character = character
+            }
+            
+            coroutine.wrap(function()
+                while PlayerESPObjects[player] and character and character.Parent do
+                    updateDistance(billboard, humanoidRootPart, player.Name)
+                    wait(0.2)
+                end
+            end)()
         end
     end
     
@@ -115,9 +233,8 @@ VisualsTab:CreateToggle({
             game:GetService("Players").PlayerAdded:Connect(addPlayerESP)
         else
             for player, espObject in pairs(PlayerESPObjects) do
-                if espObject then
-                    espObject:Destroy()
-                end
+                if espObject.Highlight then espObject.Highlight:Destroy() end
+                if espObject.Billboard then espObject.Billboard:Destroy() end
                 PlayerESPObjects[player] = nil
             end
         end
@@ -185,16 +302,30 @@ function addRakeESP(rakeModel)
     highlight.FillColor = Color3.fromRGB(139, 0, 0)
     highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
     highlight.FillTransparency = 0.3
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = game.CoreGui
 
-    RakeESPObjects[rakeModel] = highlight
+    local billboard = createBillboardGUI(primaryPart, "RAKE", Color3.fromRGB(255, 0, 0))
+    
+    RakeESPObjects[rakeModel] = {
+        Highlight = highlight,
+        Billboard = billboard.Billboard,
+        TextLabel = billboard.TextLabel,
+        Model = rakeModel
+    }
+    
+    coroutine.wrap(function()
+        while RakeESPObjects[rakeModel] and rakeModel.Parent do
+            updateDistance(billboard, primaryPart, "RAKE")
+            wait(0.2)
+        end
+    end)()
 end
 
 function removeRakeESP()
     for rakeModel, espObject in pairs(RakeESPObjects) do
-        if espObject then
-            espObject:Destroy()
-        end
+        if espObject.Highlight then espObject.Highlight:Destroy() end
+        if espObject.Billboard then espObject.Billboard:Destroy() end
         RakeESPObjects[rakeModel] = nil
     end
 end
@@ -204,7 +335,7 @@ function scanForFlareGuns()
     
     for _, item in pairs(workspace:GetChildren()) do
         if item:IsA("Model") and (string.find(string.lower(item.Name), "flare") or string.find(string.lower(item.Name), "signal")) then
-            addItemESP(item, "FlareGun", Color3.fromRGB(255, 255, 0))
+            addItemESP(item, "信号枪", Color3.fromRGB(255, 255, 0))
         end
     end
 end
@@ -214,7 +345,7 @@ function scanForLootboxes()
     
     for _, item in pairs(workspace:GetChildren()) do
         if item:IsA("Model") and (string.find(string.lower(item.Name), "lootbox") or string.find(string.lower(item.Name), "loot") or string.find(string.lower(item.Name), "crate")) then
-            addItemESP(item, "Lootbox", Color3.fromRGB(0, 255, 0))
+            addItemESP(item, "战利品箱", Color3.fromRGB(0, 255, 0))
         end
     end
 end
@@ -222,24 +353,41 @@ end
 function addItemESP(itemModel, itemType, color)
     if ItemESPObjects[itemModel] then return end
 
+    local primaryPart = itemModel.PrimaryPart or itemModel:FindFirstChild("Handle") or itemModel:FindFirstChildWhichIsA("BasePart")
+    if not primaryPart then return end
+
     local highlight = Instance.new("Highlight")
     highlight.Name = itemType .. "ESP"
     highlight.Adornee = itemModel
     highlight.FillColor = color
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.FillTransparency = 0.3
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = game.CoreGui
 
+    local billboard = createBillboardGUI(primaryPart, itemType, color)
+    
     ItemESPObjects[itemModel] = {
         Highlight = highlight,
-        Type = itemType
+        Billboard = billboard.Billboard,
+        TextLabel = billboard.TextLabel,
+        Type = itemType,
+        Model = itemModel
     }
+    
+    coroutine.wrap(function()
+        while ItemESPObjects[itemModel] and itemModel.Parent do
+            updateDistance(billboard, primaryPart, itemType)
+            wait(0.2)
+        end
+    end)()
 end
 
 function removeItemESP(itemModel)
     local espObject = ItemESPObjects[itemModel]
     if espObject then
         if espObject.Highlight then espObject.Highlight:Destroy() end
+        if espObject.Billboard then espObject.Billboard:Destroy() end
         ItemESPObjects[itemModel] = nil
     end
 end
@@ -254,7 +402,8 @@ end
 
 game:GetService("Players").PlayerRemoving:Connect(function(player)
     if PlayerESPObjects[player] then
-        PlayerESPObjects[player]:Destroy()
+        if PlayerESPObjects[player].Highlight then PlayerESPObjects[player].Highlight:Destroy() end
+        if PlayerESPObjects[player].Billboard then PlayerESPObjects[player].Billboard:Destroy() end
         PlayerESPObjects[player] = nil
     end
 end)
@@ -263,7 +412,11 @@ game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(character
     character:WaitForChild("Humanoid")
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        humanoid.WalkSpeed = currentWalkSpeed
+        if SpeedEnabled then
+            humanoid.WalkSpeed = currentWalkSpeed
+        else
+            humanoid.WalkSpeed = 16
+        end
         humanoid.JumpPower = currentJumpPower
     end
 end)
@@ -272,7 +425,11 @@ local player = game:GetService("Players").LocalPlayer
 if player and player.Character then
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        humanoid.WalkSpeed = currentWalkSpeed
+        if SpeedEnabled then
+            humanoid.WalkSpeed = currentWalkSpeed
+        else
+            humanoid.WalkSpeed = 16
+        end
         humanoid.JumpPower = currentJumpPower
     end
 end
@@ -288,6 +445,10 @@ game:GetService("RunService").Heartbeat:Connect(function()
         scanForLootboxes()
     end
 end)
+
+-- 在脚本底部添加备注
+VisualsTab:CreateSection("备注")
+VisualsTab:CreateParagraph({Title = "", Content = "The script creator is: CN_154LH"})
 
 Rayfield:Notify({
     Title = "脚本加载成功",
