@@ -1,4 +1,4 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Rayfield = loadstring(game:HttpGet('https://github.com/CN154LH/Rake-Script/blob/main/The%20Rake%20script'))()
 local Window = Rayfield:CreateWindow({
     Name = "The RAKE Script",
     LoadingTitle = "Script loading...",
