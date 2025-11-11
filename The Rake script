@@ -97,6 +97,7 @@ local currentJumpPower = 100
 
 local players = game:GetService("Players")
 local localPlayer = players.LocalPlayer
+local runService = game:GetService("RunService")
 
 local lighting = game:GetService("Lighting")
 OriginalFogStart = lighting.FogStart
@@ -105,7 +106,11 @@ OriginalFogColor = lighting.FogColor
 
 local function applyCharacterSettings(character)
     local humanoid = character:WaitForChild("Humanoid")
-    humanoid.WalkSpeed = currentWalkSpeed
+    if SpeedEnabled then
+        humanoid.WalkSpeed = currentWalkSpeed
+    else
+        humanoid.WalkSpeed = 16
+    end
     humanoid.JumpPower = currentJumpPower
 end
 
@@ -162,7 +167,7 @@ MainTab:CreateToggle({
     Callback = function(Value)
         InfiniteStaminaEnabled = Value
         if Value then
-            StaminaConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            StaminaConnection = runService.Heartbeat:Connect(function()
                 if not InfiniteStaminaEnabled then
                     StaminaConnection:Disconnect()
                     return
@@ -217,7 +222,7 @@ MainTab:CreateToggle({
     Callback = function(Value)
         GodModeEnabled = Value
         if Value then
-            GodModeConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            GodModeConnection = runService.Heartbeat:Connect(function()
                 if not GodModeEnabled then
                     GodModeConnection:Disconnect()
                     return
@@ -228,10 +233,6 @@ MainTab:CreateToggle({
                     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
                     if humanoid then
                         humanoid.Health = humanoid.MaxHealth
-                        
-                        if humanoid.Health <= 0 then
-                            humanoid.Health = humanoid.MaxHealth
-                        end
                     end
                 end
             end)
@@ -251,11 +252,13 @@ MainTab:CreateSlider({
     CurrentValue = currentWalkSpeed,
     Callback = function(Value)
         currentWalkSpeed = Value
-        local player = game:GetService("Players").LocalPlayer
-        if player and player.Character then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.WalkSpeed = Value
+        if SpeedEnabled then
+            local player = game:GetService("Players").LocalPlayer
+            if player and player.Character then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = Value
+                end
             end
         end
     end,
@@ -285,7 +288,7 @@ VisualsTab:CreateToggle({
     Callback = function(Value)
         FullBrightEnabled = Value
         if Value then
-            FullBrightConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            FullBrightConnection = runService.RenderStepped:Connect(function()
                 if not FullBrightEnabled then
                     FullBrightConnection:Disconnect()
                     return
@@ -324,8 +327,8 @@ VisualsTab:CreateToggle({
         local lighting = game:GetService("Lighting")
         
         if Value then
-            lighting.FogStart = 1000000
-            lighting.FogEnd = 1000000
+            lighting.FogStart = 0
+            lighting.FogEnd = 0
         else
             lighting.FogStart = OriginalFogStart
             lighting.FogEnd = OriginalFogEnd
@@ -636,7 +639,7 @@ if player and player.Character then
     end
 end
 
-game:GetService("RunService").Heartbeat:Connect(function()
+runService.Heartbeat:Connect(function()
     if RakeESPEnabled then
         scanForRakes()
     end
@@ -655,14 +658,19 @@ SettingsTab:CreateDropdown({
     Callback = function(Option)
         if Option == "English" then
             switchLanguage("en")
+            Rayfield:Notify({
+                Title = "Language Changed",
+                Content = "Language set to English",
+                Duration = 3
+            })
         else
             switchLanguage("zh")
+            Rayfield:Notify({
+                Title = "语言已更改",
+                Content = "语言已设置为中文",
+                Duration = 3
+            })
         end
-        Rayfield:Notify({
-            Title = "Language Changed",
-            Content = "Please reload the script for changes to take effect.",
-            Duration = 5
-        })
     end,
 })
 
