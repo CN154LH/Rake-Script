@@ -1,0 +1,128 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+    Name = "The RAKE Script",
+    LoadingTitle = "Script loading...",
+    LoadingSubtitle = "by 助手",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false, -- 如需密钥验证可设置为true
+})
+
+-- 主标签页
+local MainTab = Window:CreateTab("玩家增强", nil)
+local VisualsTab = Window:CreateTab("视觉辅助", nil)
+local AutoTab = Window:CreateTab("自动游戏", nil)
+
+-- 无限跳跃功能
+local InfiniteJumpEnabled = false
+game:GetService("UserInputService").JumpRequest:connect(function()
+    if InfiniteJumpEnabled then
+        game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+MainTab:CreateToggle({
+    Name = "开启无限跳跃",
+    CurrentValue = false,
+    Callback = function(Value)
+        InfiniteJumpEnabled = Value
+        Rayfield:Notify({
+            Title = "无限跳跃",
+            Content = Value and "已开启" or "已关闭",
+            Duration = 2
+        })
+    end,
+})
+
+-- 移动速度调节
+MainTab:CreateSlider({
+    Name = "移动速度",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = "速度",
+    CurrentValue = 16,
+    Callback = function(Value)
+        local character = game:GetService("Players").LocalPlayer.Character
+        if character and character:FindFirstChildOfClass("Humanoid") then
+            character.Humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+-- 跳跃力量调节
+MainTab:CreateSlider({
+    Name = "跳跃力量",
+    Range = {50, 200},
+    Increment = 1,
+    Suffix = "力量",
+    CurrentValue = 50,
+    Callback = function(Value)
+        local character = game:GetService("Players").LocalPlayer.Character
+        if character and character:FindFirstChildOfClass("Humanoid") then
+            character.Humanoid.JumpPower = Value
+        end
+    end,
+})
+
+-- 玩家透视 (ESP)
+VisualsTab:CreateToggle({
+    Name = "显示玩家位置 (ESP)",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            -- 创建ESP
+            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+                if player ~= game:GetService("Players").LocalPlayer and player.Character then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Parent = player.Character
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.Name = "RAKE_ESP"
+                end
+            end
+        else
+            -- 移除ESP
+            for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+                if player.Character and player.Character:FindFirstChild("RAKE_ESP") then
+                    player.Character.RAKE_ESP:Destroy()
+                end
+            end
+        end
+    end,
+})
+
+-- 自动农场 (基础版)
+local AutoFarmEnabled = false
+AutoTab:CreateToggle({
+    Name = "开启自动农场",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoFarmEnabled = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "自动农场",
+                Content = "已开始自动收集资源",
+                Duration = 3
+            })
+            
+            -- 这里是自动农场的核心循环
+            while AutoFarmEnabled do
+                -- 注意：你需要根据RAKE游戏的具体机制来完善这部分逻辑
+                -- 例如：自动收集物品、完成特定任务等
+                wait(1)
+            end
+        else
+            Rayfield:Notify({
+                Title = "自动农场",
+                Content = "已停止自动收集",
+                Duration = 2
+            })
+        end
+    end,
+})
+
+Rayfield:Notify({
+    Title = "脚本加载成功",
+    Content = "请根据需要开启功能",
+    Duration = 5,
+})
