@@ -1,6 +1,6 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Rayfield = loadstring(game:HttpGet('https://github.com/CN154LH/Rake-Script/blob/main/The%20Rake%20script'))()
 local Window = Rayfield:CreateWindow({
-    Name = "The RAKE Script",
+    Name = "The Rake script",
     LoadingTitle = "Script loading...",
     LoadingSubtitle = "by 助手",
     ConfigurationSaving = { Enabled = false },
@@ -31,7 +31,6 @@ MainTab:CreateToggle({
     end,
 })
 
--- 移动速度调节
 MainTab:CreateSlider({
     Name = "移动速度",
     Range = {16, 200},
@@ -65,7 +64,6 @@ VisualsTab:CreateToggle({
     CurrentValue = false,
     Callback = function(Value)
         if Value then
-            -- 创建ESP
             for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
                 if player ~= game:GetService("Players").LocalPlayer and player.Character then
                     local highlight = Instance.new("Highlight")
@@ -76,7 +74,6 @@ VisualsTab:CreateToggle({
                 end
             end
         else
-
             for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
                 if player.Character and player.Character:FindFirstChild("RAKE_ESP") then
                     player.Character.RAKE_ESP:Destroy()
